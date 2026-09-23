@@ -38,40 +38,54 @@
 StatusDX Dx;
 
 /*
- * Config commands, sent one a frame after the ID changes (psx-spx "Configuration Commands").
- * 45h, 46h, 47h and 4Ch only read constants; their replies go to the status block.
+ * Config test, one command a frame after the ID changes (psx-spx "Configuration Commands").
+ * It checks what a PS1 DualShock (SCPH-1200) answers, and what it does not: 45h before
+ * config mode, and a second 4Dh that must return the first one's map.
  */
 static const uint8_t CfgCmd[DX_CFG_N][9] =
 {
+	{1, 0x45, 0, 0, 0, 0, 0, 0, 0},				/*Normal mode: not a command, no /ACK*/
 	{1, 0x43, 0, 1, 0, 0, 0, 0, 0},				/*Enter config mode*/
+	{1, 0x42, 0, 0, 0, 0, 0, 0, 0},				/*Config mode read: F3h, sticks even in digital mode*/
 	{1, 0x45, 0, 0, 0, 0, 0, 0, 0},				/*Type and LED*/
 	{1, 0x46, 0, 0, 0, 0, 0, 0, 0},				/*Actuator 0*/
 	{1, 0x46, 0, 1, 0, 0, 0, 0, 0},				/*Actuator 1*/
+	{1, 0x46, 0, 2, 0, 0, 0, 0, 0},				/*No actuator 2: 00h*/
 	{1, 0x47, 0, 0, 0, 0, 0, 0, 0},
+	{1, 0x48, 0, 0, 0, 0, 0, 0, 0},
 	{1, 0x4C, 0, 0, 0, 0, 0, 0, 0},
 	{1, 0x4C, 0, 1, 0, 0, 0, 0, 0},
-	{1, 0x44, 0, 1, 3, 0, 0, 0, 0},				/*Analog on, locked*/
-	{1, 0x4D, 0, 0, 1, 255, 255, 255, 255},		/*Map the rumble motors*/
+	{1, 0x4F, 0, 0xFF, 0xFF, 0x03, 0, 0, 0},	/*DualShock 2 only: 00h on a DualShock*/
+	{1, 0x44, 0, 1, 3, 0, 0, 0, 0},				/*Analog on, locked; resets the rumble map*/
+	{1, 0x4D, 0, 0, 1, 255, 255, 255, 255},		/*Map the rumble motors: returns FFh (none)*/
+	{1, 0x4D, 0, 0, 1, 255, 255, 255, 255},		/*Again: returns the map just set*/
 	{1, 0x43, 0, 0, 0, 0, 0, 0, 0},				/*Exit config mode*/
 };
 
 /*
- * Expected bytes 1..8 of each reply from a DualShock (SCPH-1200); -1 = any.
- * psx-spx, DuckStation and PCSX-Redux agree on these.
+ * Expected bytes 1..8 of each reply from a DualShock (SCPH-1200), and its length; -1 = any.
+ * psx-spx, DuckStation, MiSTer and PsxNewLib agree on these.
  */
 static const int16_t CfgWant[DX_CFG_N][8] =
 {
+	{0xFF,   -1,   -1,   -1,   -1,   -1,   -1,   -1},
 	{  -1, 0x5A,   -1,   -1,   -1,   -1,   -1,   -1},
-	{0xF3, 0x5A,   -1, 0x02,   -1, 0x02, 0x01, 0x00},
+	{0xF3, 0x5A,   -1,   -1,   -1,   -1,   -1,   -1},
+	{0xF3, 0x5A, 0x01, 0x02,   -1, 0x02, 0x01, 0x00},
 	{0xF3, 0x5A, 0x00, 0x00, 0x01, 0x02, 0x00, 0x0A},
 	{0xF3, 0x5A, 0x00, 0x00, 0x01, 0x01, 0x01, 0x14},
+	{0xF3, 0x5A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
 	{0xF3, 0x5A, 0x00, 0x00, 0x02, 0x00, 0x01, 0x00},
+	{0xF3, 0x5A, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00},
 	{0xF3, 0x5A, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00},
 	{0xF3, 0x5A, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00},
 	{0xF3, 0x5A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
-	{0xF3, 0x5A,   -1,   -1,   -1,   -1,   -1,   -1},
+	{0xF3, 0x5A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+	{0xF3, 0x5A, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF},
+	{0xF3, 0x5A, 0x00, 0x01, 0xFF, 0xFF, 0xFF, 0xFF},
 	{0xF3, 0x5A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
 };
+static const uint8_t CfgWantLen[DX_CFG_N] = {2, 0, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9};	/*0 = any*/
 
 static uint16_t Ticks(void)
 {
@@ -228,7 +242,7 @@ void ReadPad(Controller* ctrl, int pad_n)
 	if (ctrl->ConfigState >= 1 && ctrl->ConfigState <= DX_CFG_N)
 	{
 		int c = ctrl->ConfigState - 1;
-		SendData(pad_n, CfgCmd[c], ReceivedData, sizeof(CfgCmd[c]), 0, 0);
+		p->cfg_len[c] = (uint8_t)SendData(pad_n, CfgCmd[c], ReceivedData, sizeof(CfgCmd[c]), 0, 0);
 		memcpy(p->cfg[c], &ReceivedData[1], 8);
 	}
 	else
@@ -299,7 +313,7 @@ int CfgMatches(int pad_n)
 
 	for (int c = 0; c < DX_CFG_N; c++)
 	{
-		int good = 1;
+		int good = !CfgWantLen[c] || Dx.port[pad_n].cfg_len[c] == CfgWantLen[c];
 		for (int i = 0; i < 8; i++)
 			if (CfgWant[c][i] >= 0 && Dx.port[pad_n].cfg[c][i] != CfgWant[c][i]) good = 0;
 		ok += good;

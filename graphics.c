@@ -354,7 +354,11 @@ void DrawDX(int x, int PadId)
 	GsPrintString(x, 203, 128, 128, 128, false, s);
 
 	for (i = 0; i < 16; i++) if (p->press[i]) bits++;
-	sprintf(s, "len%d cfg%d/%d btn%d", p->reply_len, CfgMatches(PadId), DX_CFG_N, bits);
+	/*A digital pad answers no config command: 43h gets FFh*/
+	if (p->cfg[1][0] == PAD_NONE)
+		sprintf(s, "len%d cfg none btn%d", p->reply_len, bits);
+	else
+		sprintf(s, "len%d cfg%d/%d btn%d", p->reply_len, CfgMatches(PadId), DX_CFG_N, bits);
 	GsPrintString(x, 213, 128, 128, 128, false, s);
 
 	if (p->type != PAD_ANALOG) return;

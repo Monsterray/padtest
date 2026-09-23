@@ -6,19 +6,19 @@
  * Each frame it is copied to VRAM at (DX_VRAM_X, DX_VRAM_Y), DX_VRAM_W x DX_VRAM_H
  * halfwords, rows in order. An emulator VRAM dump holds it; WiiStation's
  * scripts/padtest_dx.py decodes it. All fields are little-endian.
- * Change DX_VERSION when the layout changes.
+ * Change DX_VERSION when the layout or the meaning of a field changes.
  */
 
 #include <stdint.h>
 
 #define DX_MAGIC		0x58445450	/*"PTDX"*/
-#define DX_VERSION		2
+#define DX_VERSION		3
 #define DX_VRAM_X		640
 #define DX_VRAM_Y		256
 #define DX_VRAM_W		64
 #define DX_VRAM_H		8
 
-#define DX_CFG_N		10		/*Config commands, in the order they are sent (see controllers.c)*/
+#define DX_CFG_N		16		/*Config commands, in the order they are sent (see controllers.c)*/
 #define DX_NO_ACK		0xFFFF
 
 typedef struct
@@ -40,6 +40,7 @@ typedef struct
 	uint8_t  axis_max[4];
 	uint8_t  seen[4][32];		/*Bit map of each raw value an axis gave*/
 	uint8_t  cfg[DX_CFG_N][8];	/*Bytes 1..8 of the reply to each config command*/
+	uint8_t  cfg_len[DX_CFG_N];	/*Its length in bytes*/
 }PortDX;
 
 typedef struct
@@ -52,7 +53,7 @@ typedef struct
 	PortDX   port[2];
 }StatusDX;
 
-_Static_assert(sizeof(PortDX) == 328, "PortDX layout");
+_Static_assert(sizeof(PortDX) == 392, "PortDX layout");
 _Static_assert(sizeof(StatusDX) <= DX_VRAM_W * DX_VRAM_H * 2, "StatusDX does not fit");
 
 extern StatusDX Dx;
