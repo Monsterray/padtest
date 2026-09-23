@@ -13,14 +13,14 @@ jobs:
   build:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install tools
         run: sudo apt-get update && sudo apt-get install -y ninja-build cppcheck
 
       - name: Cache PSn00bSDK
         id: sdk-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/psn00bsdk
           key: psn00bsdk-${{ env.PSN00BSDK_VERSION }}-linux
@@ -50,13 +50,16 @@ jobs:
           cmake --build build
 
       - name: cppcheck
+        # Each finding becomes an annotation on the run
         run: >
+          cppcheck --version &&
           cppcheck --enable=all --check-level=exhaustive --std=c11 --platform=unix32
           --error-exitcode=1 --inline-suppr
+          --template='::error file={file},line={line}::cppcheck {severity} [{id}] {message}'
           --suppress=missingIncludeSystem --suppress=missingInclude --suppress=checkersReport
           -I include -I "$HOME/psn00bsdk/include/libpsn00b" -q *.c
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: padtest
           path: |
