@@ -7,9 +7,10 @@
 #include "images/buttons.h"
 #include "images/mouse.h"
 
-void InitGraphics(){
-	/*Set video mode based on the console's region*/
-	GsInit(*(char *)0xbfc7ff52 == 'E');
+void InitGraphics(void)
+{
+	/*Video mode from the console's region*/
+	GsInit();
 
 	/*Load font to VRAM*/
 	InitText();
@@ -19,7 +20,8 @@ void InitGraphics(){
 	GsLoadTim(Mouse_tim);
 }
 
-void DrawPlus(int x, int y)
+/*Draw green plus (used for analog sticks)*/
+static void DrawPlus(int x, int y)
 {
 	GsLine PlusLine;
 	
@@ -42,7 +44,7 @@ void DrawPlus(int x, int y)
 	GsSortLine(&PlusLine);
 }
 
-void DrawTitle(char* softwareTitle, char* copyright)
+void DrawTitle(const char* softwareTitle, const char* copyright)
 {
 	int FontX = 0;
 	GsRectangle TopRect;
@@ -71,10 +73,10 @@ void DrawTitle(char* softwareTitle, char* copyright)
 	GsPrintString(304 - GetPrintedStringWidth(false, copyright), 16, 128, 128, 128, false, copyright);
 }
 
-void DrawMouse(int x, int y, int PadId, Controller* ctrl){
+/*Draw the mouse, its buttons and its cursor*/
+static void DrawMouse(int x, int y, const Controller* ctrl)
+{
 	GsSprite MouseSprite;
-	char test[25];
-
 
 	MouseSprite.x = x + 26;
 	MouseSprite.y = y + 10;
@@ -111,15 +113,23 @@ void DrawMouse(int x, int y, int PadId, Controller* ctrl){
 	DrawPlus(ctrl->CursorX, ctrl->CursorY);
 }
 
+/*Draw a button sprite; the pressed image is 16 pixels to the right of the released one*/
+static void DrawButton(const GsSprite *s, unsigned pressed)
+{
+	GsSprite b = *s;
+
+	if (pressed) b.u += 16;
+	GsSortSimpleSprite(&b);
+}
+
 /*Draw controller at the specified coordinates*/
-void DrawController(int x, int y, int PadId, Controller* ctrl)
+void DrawController(int x, int y, Controller* ctrl)
 {
     GsSprite PadSprite;
 
 	int FontX = 0;
-	int PressedOffset = 0;
 	int AnalogEnabled = 0;
-	unsigned short buttons = ctrl->Buttons;
+	unsigned buttons = ctrl->Buttons;
 	int StickX[2] = {0, 0};
 	int StickY[2] = {0, 0};
 	char TempString[50];
@@ -140,7 +150,7 @@ void DrawController(int x, int y, int PadId, Controller* ctrl)
         case PAD_MOUSE:
 			FontX = GetPrintedStringWidth(false, "Mouse");
 			GsPrintString(x + 70 - (FontX/2), 56, 128, 128, 128, false, "Mouse");
-			DrawMouse(x, y, PadId, ctrl);
+			DrawMouse(x, y, ctrl);
             return;
 
 		case PAD_DIGITAL:
@@ -172,39 +182,21 @@ void DrawController(int x, int y, int PadId, Controller* ctrl)
 	PadSprite.attribute = COLORMODE(COLORMODE_8BPP);
 	
 	/*L1*/
-	if(buttons & PAD_L1)
-	{
-		PadSprite.u += 16;
-		GsSortSimpleSprite(&PadSprite);
-		PadSprite.u -= 16;
-	}
-	else GsSortSimpleSprite(&PadSprite);
+	DrawButton(&PadSprite, buttons & PAD_L1);
 	
 	
 	/*L2*/
 	PadSprite.v -= 16;
 	PadSprite.y += 16;
 	
-	if(buttons & PAD_L2)
-	{
-		PadSprite.u += 16;
-		GsSortSimpleSprite(&PadSprite);
-		PadSprite.u -= 16;
-	}
-	else GsSortSimpleSprite(&PadSprite);
+	DrawButton(&PadSprite, buttons & PAD_L2);
 	
 	
 	/*UP*/
 	PadSprite.u -= 32;
 	PadSprite.y += 32;
 	
-	if(buttons & PAD_UP)
-	{
-		PadSprite.u += 16;
-		GsSortSimpleSprite(&PadSprite);
-		PadSprite.u -= 16;
-	}
-	else GsSortSimpleSprite(&PadSprite);
+	DrawButton(&PadSprite, buttons & PAD_UP);
 	
 	
 	/*LEFT*/
@@ -212,26 +204,14 @@ void DrawController(int x, int y, int PadId, Controller* ctrl)
 	PadSprite.x -= 10;
 	PadSprite.y += 10;
 	
-	if(buttons & PAD_LEFT)
-	{
-		PadSprite.u += 16;
-		GsSortSimpleSprite(&PadSprite);
-		PadSprite.u -= 16;
-	}
-	else GsSortSimpleSprite(&PadSprite);
+	DrawButton(&PadSprite, buttons & PAD_LEFT);
 	
 	/*DOWN*/
 	PadSprite.v -= 16;
 	PadSprite.x += 10;
 	PadSprite.y += 10;
 	
-	if(buttons & PAD_DOWN)
-	{
-		PadSprite.u += 16;
-		GsSortSimpleSprite(&PadSprite);
-		PadSprite.u -= 16;
-	}
-	else GsSortSimpleSprite(&PadSprite);
+	DrawButton(&PadSprite, buttons & PAD_DOWN);
 	
 	
 	/*RIGHT*/
@@ -239,13 +219,7 @@ void DrawController(int x, int y, int PadId, Controller* ctrl)
 	PadSprite.x +=10;
 	PadSprite.y -= 10;
 	
-	if(buttons & PAD_RIGHT)
-	{
-		PadSprite.u += 16;
-		GsSortSimpleSprite(&PadSprite);
-		PadSprite.u -= 16;
-	}
-	else GsSortSimpleSprite(&PadSprite);
+	DrawButton(&PadSprite, buttons & PAD_RIGHT);
 	
 	
 	/*SELECT*/
@@ -253,26 +227,14 @@ void DrawController(int x, int y, int PadId, Controller* ctrl)
 	PadSprite.v -= 16;
 	PadSprite.x += 26;
 	
-	if(buttons & PAD_SELECT)
-	{
-		PadSprite.u += 16;
-		GsSortSimpleSprite(&PadSprite);
-		PadSprite.u -= 16;
-	}
-	else GsSortSimpleSprite(&PadSprite);
+	DrawButton(&PadSprite, buttons & PAD_SELECT);
 	
 	
 	/*START*/
 	PadSprite.v += 16;
 	PadSprite.x += 26;
 	
-	if(buttons & PAD_START)
-	{
-		PadSprite.u += 16;
-		GsSortSimpleSprite(&PadSprite);
-		PadSprite.u -= 16;
-	}
-	else GsSortSimpleSprite(&PadSprite);
+	DrawButton(&PadSprite, buttons & PAD_START);
 	
 	
 	/*SQUARE*/
@@ -280,26 +242,14 @@ void DrawController(int x, int y, int PadId, Controller* ctrl)
 	PadSprite.v += 64;
 	PadSprite.x += 26;
 	
-	if(buttons & PAD_SQUARE)
-	{
-		PadSprite.u += 16;
-		GsSortSimpleSprite(&PadSprite);
-		PadSprite.u -= 16;
-	}
-	else GsSortSimpleSprite(&PadSprite);
+	DrawButton(&PadSprite, buttons & PAD_SQUARE);
 	
 	/*CROSS*/
 	PadSprite.v -= 32;
 	PadSprite.x += 13;
 	PadSprite.y += 13;	
 	
-	if(buttons & PAD_CROSS)
-	{
-		PadSprite.u += 16;
-		GsSortSimpleSprite(&PadSprite);
-		PadSprite.u -= 16;
-	}
-	else GsSortSimpleSprite(&PadSprite);
+	DrawButton(&PadSprite, buttons & PAD_CROSS);
 	
 	
 	/*CIRCLE*/
@@ -307,13 +257,7 @@ void DrawController(int x, int y, int PadId, Controller* ctrl)
 	PadSprite.x += 13;
 	PadSprite.y -= 13;	
 	
-	if(buttons & PAD_CIRCLE)
-	{
-		PadSprite.u += 16;
-		GsSortSimpleSprite(&PadSprite);
-		PadSprite.u -= 16;
-	}
-	else GsSortSimpleSprite(&PadSprite);
+	DrawButton(&PadSprite, buttons & PAD_CIRCLE);
 	
 	
 	/*TRIANGLE*/
@@ -321,13 +265,7 @@ void DrawController(int x, int y, int PadId, Controller* ctrl)
 	PadSprite.x -= 13;
 	PadSprite.y -= 13;	
 	
-	if(buttons & PAD_TRIANGLE)
-	{
-		PadSprite.u += 16;
-		GsSortSimpleSprite(&PadSprite);
-		PadSprite.u -= 16;
-	}
-	else GsSortSimpleSprite(&PadSprite);
+	DrawButton(&PadSprite, buttons & PAD_TRIANGLE);
 	
 	
 	/*R2*/
@@ -335,26 +273,14 @@ void DrawController(int x, int y, int PadId, Controller* ctrl)
 	PadSprite.v -= 96;
 	PadSprite.y -= 29;
 	
-	if(buttons & PAD_R2)
-	{
-		PadSprite.u += 16;
-		GsSortSimpleSprite(&PadSprite);
-		PadSprite.u -= 16;
-	}
-	else GsSortSimpleSprite(&PadSprite);
+	DrawButton(&PadSprite, buttons & PAD_R2);
 	
 	
 	/*R1*/
 	PadSprite.v += 16;
 	PadSprite.y -= 16;
 	
-	if(buttons & PAD_R1)
-	{
-		PadSprite.u += 16;
-		GsSortSimpleSprite(&PadSprite);
-		PadSprite.u -= 16;
-	}
-	else GsSortSimpleSprite(&PadSprite);
+	DrawButton(&PadSprite, buttons & PAD_R1);
 	
 	/*Return if this is not analog controller*/
 	if(AnalogEnabled == 0) return;
@@ -418,7 +344,7 @@ void DrawController(int x, int y, int PadId, Controller* ctrl)
 void DrawDX(int x, int PadId)
 {
 	PortDX *p = &Dx.port[PadId];
-	char s[64];
+	char s[64] = "";
 	int i, n = 0, bits = 0;
 
 	if (p->type == PAD_NONE) return;

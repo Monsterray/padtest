@@ -12,7 +12,7 @@
 #include <stdint.h>
 
 #define DX_MAGIC		0x58445450	/*"PTDX"*/
-#define DX_VERSION		1
+#define DX_VERSION		2
 #define DX_VRAM_X		640
 #define DX_VRAM_Y		256
 #define DX_VRAM_W		64
@@ -24,13 +24,13 @@
 typedef struct
 {
 	uint8_t  reply[20];			/*Last poll: byte 0 = HiZ, 1 = ID, 2 = 5Ah, then data*/
-	uint16_t ack[20];			/*Loops waited for /ACK after each byte of it; DX_NO_ACK = none or not waited for*/
+	uint16_t ack[20];			/*End of each byte to /ACK, system clock ticks (F_CPU); DX_NO_ACK = none or last byte*/
 	uint8_t  reply_len;			/*Bytes clocked: the device acknowledged all but the last*/
 	uint8_t  type;				/*ID byte of the last poll*/
 	uint8_t  cfg_state;
 	uint8_t  pad0;
 	uint16_t buttons;			/*Last poll, 1 = pressed*/
-	uint16_t pad1;
+	uint16_t byte_ticks;		/*Last poll: write of byte 1 to its reply, system clock ticks (hardware: 32 us)*/
 	uint32_t polls;				/*Polls that got a reply*/
 	uint32_t type_changes;
 	uint16_t press[16];			/*Presses (0 to 1 changes) of each button bit*/

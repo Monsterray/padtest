@@ -1,0 +1,65 @@
+# Build PadTest with PSn00bSDK, warnings as errors, and check it with cppcheck.
+name: build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+env:
+  PSN00BSDK_VERSION: "0.24"
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install tools
+        run: sudo apt-get update && sudo apt-get install -y ninja-build cppcheck
+
+      - name: Cache PSn00bSDK
+        id: sdk-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/psn00bsdk
+          key: psn00bsdk-${{ env.PSN00BSDK_VERSION }}-linux
+
+      - name: Download PSn00bSDK
+        if: steps.sdk-cache.outputs.cache-hit != 'true'
+        run: |
+          base=https://github.com/Lameguy64/PSn00bSDK/releases/download/v$PSN00BSDK_VERSION
+          curl -fsSL -o sdk.zip "$base/PSn00bSDK-$PSN00BSDK_VERSION-Linux.zip"
+          unzip -q sdk.zip -d ~/sdk-unpack
+          mv ~/sdk-unpack/* ~/psn00bsdk
+          # Older releases ship the GCC toolchain separately
+          if [ ! -x ~/psn00bsdk/bin/mipsel-none-elf-gcc ]; then
+            curl -fsSL -o gcc.zip "$base/gcc-mipsel-none-elf-12.3.0-linux.zip"
+            unzip -q gcc.zip -d ~/psn00bsdk
+          fi
+
+      - name: Set up environment
+        run: |
+          echo "$HOME/psn00bsdk/bin" >> "$GITHUB_PATH"
+          echo "PSN00BSDK_LIBS=$HOME/psn00bsdk/lib/libpsn00b" >> "$GITHUB_ENV"
+
+      - name: Build
+        run: |
+          mipsel-none-elf-gcc --version | head -n 1
+          cmake --preset default . -DPADTEST_WERROR=ON
+          cmake --build build
+
+      - name: cppcheck
+        run: >
+          cppcheck --enable=all --check-level=exhaustive --std=c11 --platform=unix32
+          --error-exitcode=1 --inline-suppr
+          --suppress=missingIncludeSystem --suppress=missingInclude --suppress=checkersReport
+          -I include -I "$HOME/psn00bsdk/include/libpsn00b" -q *.c
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: padtest
+          path: |
+            build/padtest.exe
+            build/padtest.bin
+            build/padtest.cue

@@ -4,19 +4,13 @@
 #include "controllers.h"
 
 /*Set everything up*/
-void InitGraphics();
-
-/*Draw green plus (used for analog sticks)*/
-void DrawPlus(int x, int y);
+void InitGraphics(void);
 
 /*Draw title bar*/
-void DrawTitle(char* softwareTitle, char* copyright);
+void DrawTitle(const char* softwareTitle, const char* copyright);
 
 /*Draw controller on screen with all the properties*/
-void DrawController(int x, int y, int PadId, Controller* ctrl);
-
-/*As the name implies draw mouse with all it's properties*/
-void DrawMouse(int x, int y, int PadId, Controller* ctrl);
+void DrawController(int x, int y, Controller* ctrl);
 
 /*Draw the diagnostic lines for a port at the bottom of the screen*/
 void DrawDX(int x, int PadId);

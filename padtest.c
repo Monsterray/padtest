@@ -11,9 +11,9 @@
 #define SOFTWARE_COPYRIGHT	"Shendo, ggrtk\nPSn00bSDK"
 
 /*Controller for each port*/
-Controller Controllers[2];
+static Controller Controllers[2];
 
-int main()
+int main(void)
 {
 	InitGraphics();
 	InitPad();
@@ -33,8 +33,8 @@ int main()
 		ReadPad(&Controllers[1], 1);
 
 		/*Draw controllers on the screen*/
-		DrawController(10, 65, 0, &Controllers[0]);
-		DrawController(170, 65, 1, &Controllers[1]);
+		DrawController(10, 65, &Controllers[0]);
+		DrawController(170, 65, &Controllers[1]);
 		DrawDX(10, 0);
 		DrawDX(170, 1);
 

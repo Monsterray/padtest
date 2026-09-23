@@ -3,42 +3,36 @@
 #include "include/fontspace.h"
 #include "include/font.h"
 
-void InitText(){
+/*The font holds characters 20h..7Fh*/
+#define FIRST_CHAR	0x20
+#define LAST_CHAR	0x7F
+
+void InitText(void)
+{
 	/*Load a custom font and upload it to VRAM*/
 	GsLoadTim(FontTimData);
 }
 
-int GetPrintedStringWidth(char monospace, char *string)
+/*Advance of a character, or 0 if the font does not hold it*/
+static int CharWidth(unsigned char c, bool monospace)
+{
+	if (c < FIRST_CHAR || c > LAST_CHAR) return 0;
+	return monospace ? 8 : FontSpace[c - FIRST_CHAR] + 1;
+}
+
+int GetPrintedStringWidth(bool monospace, const char *string)
 {
 	int StringWidth = 0;
-	char CharOffset;
-		
-	while(*string)
-	{
-		/*Check if this is a printable character*/
-		if(*string >= 0x20 && *string <= 0x7F)
-		{
-			/*Get char offset*/
-			CharOffset = *string - 0x20;
-			
-			if(monospace) StringWidth += 8;
-			else StringWidth += (FontSpace[CharOffset] + 1);
-		}
 
-		/*Check if this is a newline character*/
-		if(*string == '\n') return StringWidth;
-		
-		/*Point to the next character*/
-		string++;
-	}
+	for (; *string && *string != '\n'; string++)
+		StringWidth += CharWidth((unsigned char)*string, monospace);
 	
 	return StringWidth;
 }
 
-void GsPrintString(int x, int y, char Red, char Green, char Blue, char monospace, char *string)
+void GsPrintString(int x, int y, uint8_t Red, uint8_t Green, uint8_t Blue, bool monospace, const char *string)
 {
 	GsSprite CharSprite;
-	char CharOffset;
 	
 	/*Set up character sprite*/
 	if(x < 0)CharSprite.x = 160 - (GetPrintedStringWidth(monospace, string)/2);
@@ -55,35 +49,31 @@ void GsPrintString(int x, int y, char Red, char Green, char Blue, char monospace
 	CharSprite.tpage = 5;
 	CharSprite.attribute = COLORMODE(COLORMODE_8BPP);
 
-	while(*string)
+	for (; *string; string++)
 	{
-		/*Check if this is a printable character*/
-		if(*string >= 0x20 && *string <= 0x7F)
-		{
-			/*Get char offset*/
-			CharOffset = *string - 0x20;
+		unsigned char c = (unsigned char)*string;
 
-			CharSprite.u = (CharOffset%0x20) * 8;
-			CharSprite.v = (CharOffset/0x20) * 8;
-
-			/*Place sprite in the drawing list*/
-			GsSortSimpleSprite(&CharSprite);
-			
-			/*Increase X offset*/
-			if(monospace) CharSprite.x += 8;
-			else CharSprite.x += (FontSpace[CharOffset] + 1);
-		}
-		
 		/*Check if this is a newline character*/
-		if(*string == '\n')
+		if (c == '\n')
 		{
-			string++;
-		
-			if(x < 0)CharSprite.x = 160 - (GetPrintedStringWidth(monospace, string)/2);
+			if(x < 0)CharSprite.x = 160 - (GetPrintedStringWidth(monospace, string + 1)/2);
 			else CharSprite.x = x;
 			
 			CharSprite.y += 10;
+			continue;
 		}
-		else string++;
+
+		/*Skip characters the font does not hold*/
+		if (!CharWidth(c, monospace)) continue;
+
+		/*The font is 32 characters a row, 8x8 each*/
+		CharSprite.u = ((c - FIRST_CHAR) % 32) * 8;
+		CharSprite.v = ((c - FIRST_CHAR) / 32) * 8;
+
+		/*Place sprite in the drawing list*/
+		GsSortSimpleSprite(&CharSprite);
+		
+		/*Increase X offset*/
+		CharSprite.x += CharWidth(c, monospace);
 	}
 }

@@ -1,4 +1,5 @@
 # PadTest DX
+[![build](https://github.com/Monsterray/padtest/actions/workflows/build.yml/badge.svg)](https://github.com/Monsterray/padtest/actions/workflows/build.yml)
 ### Gamepad test application for PlayStation 1
 
 A fork of Shendo and ggrtk's PadTest 1.1, ported to PSn00bSDK and extended for emulator
@@ -9,9 +10,15 @@ debugging (WiiStation). It also shows, for each port:
 * for analog pads, how many distinct values each axis gave (`axes LX LY RX RY`).
 
 Each frame it also copies a status block to VRAM at (640,256), 64x8 halfwords, layout in
-`include/dx.h`: the last poll with the /ACK wait after each byte, the replies to config
-commands 43h 45h 46h 47h 4Ch 44h 4Dh, per-button press counts and a bit map of every raw
-axis value. An emulator VRAM dump holds it; WiiStation's `scripts/padtest_dx.py` decodes it.
+`include/dx.h`: the last poll, the time from each byte to its /ACK and the time a byte took
+(root counter 2 at the system clock), the replies to config commands 43h 45h 46h 47h 4Ch
+44h 4Dh, per-button press counts and a bit map of every raw axis value. An emulator VRAM
+dump holds it; WiiStation's `scripts/padtest_dx.py` decodes it.
+
+The controller port is driven as the hardware requires (psx-spx, PSn00bSDK's pads example):
+/CS low 20 us before the first byte, /ACK awaited for up to 100 us after each byte but the
+last, the /ACK flag cleared only after /ACK is high again, and the reply length taken from
+the ID byte.
 
 ![padtestscreen](https://raw.githubusercontent.com/ShendoXT/padtest/master/images/screenshot.png)
 ## Supported controllers:
@@ -30,6 +37,10 @@ and the CD image `build/padtest.bin` + `build/padtest.cue`. `build.sh` does the 
 machine where another cmake comes first on the PATH.
 
 The images are TIM files converted to C arrays (`images/*.h`, `include/font.h`).
+
+The build uses strict warnings (`-Wall -Wextra -Wpedantic -Wconversion` and more, see
+`CMakeLists.txt`); `-DPADTEST_WERROR=ON` makes them errors. CI (`.github/workflows/build.yml`)
+builds with that on, runs cppcheck, and keeps the CD image as an artifact.
 
 ### Usage:
 Connect a controller of your choice to either port and test it's buttons.

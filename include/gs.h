@@ -6,6 +6,7 @@
  * Primitives are drawn in the order they are sorted.
  */
 
+#include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <psxgpu.h>
@@ -35,8 +36,8 @@ typedef struct
 	int attribute;
 }GsLine;
 
-/*Set up the GPU: two 320x240 buffers at y = 0 and y = 256*/
-void GsInit(int pal);
+/*Set up the GPU in the console's video mode: two 320x240 buffers at y = 0 and y = 256*/
+void GsInit(void);
 
 /*Upload a TIM image (and its CLUT) to VRAM. The data must be 4-byte aligned*/
 void GsLoadTim(const void *tim);
@@ -44,9 +45,9 @@ void GsLoadTim(const void *tim);
 /*Show the buffer drawn last, clear the other one and start a new list*/
 void GsFlip(void);
 
-void GsSortSimpleSprite(GsSprite *s);
-void GsSortRectangle(GsRectangle *r);
-void GsSortLine(GsLine *l);
+void GsSortSimpleSprite(const GsSprite *s);
+void GsSortRectangle(const GsRectangle *r);
+void GsSortLine(const GsLine *l);
 
 /*Draw the list and wait for the GPU*/
 void GsDrawList(void);
