@@ -56,7 +56,7 @@ jobs:
           cppcheck --enable=all --check-level=exhaustive --std=c11 --platform=unix32
           --error-exitcode=1 --inline-suppr
           --template='::error file={file},line={line}::cppcheck {severity} [{id}] {message}'
-         System --suppress=checkersReport
+          --suppress=missingIncludeSystem --suppress=checkersReport
           -I include -I "$HOME/psn00bsdk/include/libpsn00b" -q *.c
 
       - uses: actions/upload-artifact@v7
