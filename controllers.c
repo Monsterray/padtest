@@ -218,7 +218,6 @@ static void RecordPoll(PortDX *p, Controller *ctrl, const uint8_t *rx)
 
 void ReadPad(Controller* ctrl, int pad_n)
 {
-	uint8_t DataToSend[] =  {1, 0x42, 0, 0, 0, 0, 0, 0, 0};			/*Standard data polling command*/
 	uint8_t ReceivedData[20];
 	uint16_t Ack[20];
 	PortDX *p = &Dx.port[pad_n];
@@ -234,8 +233,8 @@ void ReadPad(Controller* ctrl, int pad_n)
 	}
 	else
 	{
-		DataToSend[3] = ctrl->SmallMotor;
-		DataToSend[4] = ctrl->BigMotor;
+		/*Standard data polling command, with the rumble motor values*/
+		const uint8_t DataToSend[] = {1, 0x42, 0, ctrl->SmallMotor, ctrl->BigMotor, 0, 0, 0, 0};
 
 		/*Read button status*/
 		p->reply_len = (uint8_t)SendData(pad_n, DataToSend, ReceivedData, sizeof(DataToSend), Ack, &p->byte_ticks);
