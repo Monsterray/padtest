@@ -6,15 +6,6 @@
 /*Set everything up*/
 void InitGraphics();
 
-/*This function gets called each VBlank*/
-void VBlankHandler();
-
-/*Wait for vertical sync*/
-void VSync();
-
-/*Flip main and back-buffer*/
-void FlipBuffer();
-
 /*Draw green plus (used for analog sticks)*/
 void DrawPlus(int x, int y);
 
@@ -26,5 +17,8 @@ void DrawController(int x, int y, int PadId, Controller* ctrl);
 
 /*As the name implies draw mouse with all it's properties*/
 void DrawMouse(int x, int y, int PadId, Controller* ctrl);
+
+/*Draw the diagnostic lines for a port at the bottom of the screen*/
+void DrawDX(int x, int PadId);
 
 #endif

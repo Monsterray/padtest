@@ -1,5 +1,17 @@
-# PadTest
+# PadTest DX
 ### Gamepad test application for PlayStation 1
+
+A fork of Shendo and ggrtk's PadTest 1.1, ported to PSn00bSDK and extended for emulator
+debugging (WiiStation). It also shows, for each port:
+* the raw reply to the last poll (ID, 5Ah, data bytes, in pairs);
+* the reply length, the config commands answered as a DualShock does (`cfg n/10`) and the
+  button bits pressed so far (`btn n`);
+* for analog pads, how many distinct values each axis gave (`axes LX LY RX RY`).
+
+Each frame it also copies a status block to VRAM at (640,256), 64x8 halfwords, layout in
+`include/dx.h`: the last poll with the /ACK wait after each byte, the replies to config
+commands 43h 45h 46h 47h 4Ch 44h 4Dh, per-button press counts and a bit map of every raw
+axis value. An emulator VRAM dump holds it; WiiStation's `scripts/padtest_dx.py` decodes it.
 
 ![padtestscreen](https://raw.githubusercontent.com/ShendoXT/padtest/master/images/screenshot.png)
 ## Supported controllers:
@@ -9,10 +21,15 @@
 
 ## Requirements:
 * A way to run homebrew on PlayStation, be it modchip, cart, swap method or FreePSXBoot.
-* (For developers) Working PSXSDK toolchain to compile the software. You can download it here: http://unhaut.epizy.com/psxsdk/?i=1.
+* (For developers) PSn00bSDK 0.24 or later (https://github.com/Lameguy64/PSn00bSDK), with
+  `PSN00BSDK_LIBS` set to its `lib/libpsn00b` folder, and CMake 3.21 or later.
 
 ## How to compile:
-Run "make res" to compile resources and then "make" to build the software.
+`cmake --preset default .` and then `cmake --build build`. The output is `build/padtest.exe`
+and the CD image `build/padtest.bin` + `build/padtest.cue`. `build.sh` does the same on a
+machine where another cmake comes first on the PATH.
+
+The images are TIM files converted to C arrays (`images/*.h`, `include/font.h`).
 
 ### Usage:
 Connect a controller of your choice to either port and test it's buttons.

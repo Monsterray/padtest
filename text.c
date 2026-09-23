@@ -1,14 +1,11 @@
-#include <psx.h>
+#include "include/gs.h"
 #include "include/text.h"
 #include "include/fontspace.h"
 #include "include/font.h"
 
 void InitText(){
-    GsImage FontImage;
-
 	/*Load a custom font and upload it to VRAM*/
-	GsImageFromTim(&FontImage, FontTimData);
-	GsUploadImage(&FontImage);
+	GsLoadTim(FontTimData);
 }
 
 int GetPrintedStringWidth(char monospace, char *string)

@@ -1,58 +1,22 @@
-#include <psx.h>
 #include <stdio.h>
+#include "include/gs.h"
 #include "include/graphics.h"
 #include "include/text.h"
+#include "include/dx.h"
 
 #include "images/buttons.h"
 #include "images/mouse.h"
 
-int dbuf = 0;
-int VBlank = 0;
-unsigned int PrimList[0x8000];
-
 void InitGraphics(){
-    GsImage PadImage;
-    GsImage MouseImage;
-
-	GsInit();					/*Init GPU*/
-	GsSetList(PrimList);
-	GsClearMem();
-	
 	/*Set video mode based on the console's region*/
-	if(*(char *)0xbfc7ff52 == 'E')	GsSetVideoMode(320, 240, VMODE_PAL);
-	else GsSetVideoMode(320, 240, VMODE_NTSC);
+	GsInit(*(char *)0xbfc7ff52 == 'E');
 
 	/*Load font to VRAM*/
 	InitText();
 	
-	/*Load controller buttons image*/
-	GsImageFromTim(&PadImage, (void*)Buttons_tim);
-	GsUploadImage(&PadImage);
-	
-	/*Load mouse image*/
-	GsImageFromTim(&MouseImage, (void*)Mouse_tim);
-	GsUploadImage(&MouseImage);
-
-	SetVBlankHandler(VBlankHandler);
-}
-
-void VBlankHandler()
-{
-	VBlank = 1;
-	IPENDING &= 0xFFFE;		/*Acknowledge VBlank in status register*/
-}
-
-void VSync()
-{
-	VBlank = 0;
-	while(VBlank == 0);
-}
-
-void FlipBuffer()
-{
-	dbuf=!dbuf;
-	GsSetDispEnvSimple(0, dbuf ? 0 : 256);
-	GsSetDrawEnvSimple(0, dbuf ? 256 : 0, 320, 240);
+	/*Load controller buttons and mouse images*/
+	GsLoadTim(Buttons_tim);
+	GsLoadTim(Mouse_tim);
 }
 
 void DrawPlus(int x, int y)
@@ -103,7 +67,8 @@ void DrawTitle(char* softwareTitle, char* copyright)
 	FontX = GetPrintedStringWidth(false, "PORT 2");
 	GsPrintString(240 - (FontX/2), 46, 128, 128, 128, false, "PORT 2");
 	
-	GsPrintString(16, 210, 128, 128, 128, false, copyright);
+	/*Credits go top right: the bottom lines hold the diagnostics*/
+	GsPrintString(304 - GetPrintedStringWidth(false, copyright), 16, 128, 128, 128, false, copyright);
 }
 
 void DrawMouse(int x, int y, int PadId, Controller* ctrl){
@@ -447,4 +412,34 @@ void DrawController(int x, int y, int PadId, Controller* ctrl)
 	DrawPlus(x + 94 + (StickX[1]/8), y + 96 + (StickY[1]/8));
 	sprintf(TempString, "X: %d\nY: %d", StickX[1], StickY[1]);
 	GsPrintString(x + 78, y + 116, 128, 128, 128, false, TempString);
+}
+
+/*Draw what the port sent: raw reply, reply length, config replies, sweep counters*/
+void DrawDX(int x, int PadId)
+{
+	PortDX *p = &Dx.port[PadId];
+	char s[64];
+	int i, n = 0, bits = 0;
+
+	if (p->type == PAD_NONE) return;
+
+	/*ID, 5Ah, then the data bytes, in pairs to fit the column*/
+	for (i = 1; i < p->reply_len && i < 9; i++) n += sprintf(s + n, (i & 1) ? "%02X" : "%02X ", p->reply[i]);
+	GsPrintString(x, 203, 128, 128, 128, false, s);
+
+	for (i = 0; i < 16; i++) if (p->press[i]) bits++;
+	sprintf(s, "len%d cfg%d/%d btn%d", p->reply_len, CfgMatches(PadId), DX_CFG_N, bits);
+	GsPrintString(x, 213, 128, 128, 128, false, s);
+
+	if (p->type != PAD_ANALOG) return;
+
+	/*Distinct values each axis gave: LX LY RX RY*/
+	n = sprintf(s, "axes");
+	for (int a = 0; a < 4; a++)
+	{
+		int c = 0;
+		for (i = 0; i < 32; i++) c += __builtin_popcount(p->seen[a][i]);
+		n += sprintf(s + n, " %d", c);
+	}
+	GsPrintString(x, 223, 128, 128, 128, false, s);
 }

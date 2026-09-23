@@ -1,15 +1,14 @@
-#include <psx.h>
 #include <stdio.h>
 #include <string.h>
 
+#include "include/gs.h"
 #include "include/text.h"
 #include "include/controllers.h"
 #include "include/graphics.h"
+#include "include/dx.h"
 
-#define SOFTWARE_TITLE		"PadTest 1.1\n2022-12-05"
-#define SOFTWARE_COPYRIGHT	"Authors: Shendo, ggrtk.\nPSXSDK by Tails92."
-
-//#define DEBUG
+#define SOFTWARE_TITLE		"PadTest 1.2 DX\n2026-09-23"
+#define SOFTWARE_COPYRIGHT	"Shendo, ggrtk\nPSn00bSDK"
 
 /*Controller for each port*/
 Controller Controllers[2];
@@ -18,7 +17,7 @@ int main()
 {
 	InitGraphics();
 	InitPad();
-	
+
 	/*Set default values for both controllers*/
 	ResetPad(&Controllers[0]);
 	ResetPad(&Controllers[1]);
@@ -26,11 +25,9 @@ int main()
 	/*Main loop of the application*/
 	while(1)
 	{
-		/*Flip main and back buffer*/
-		FlipBuffer();
-	
-		GsSortCls(0,0,0);
-		
+		/*Flip main and back buffer, clear the new back buffer*/
+		GsFlip();
+
 		DrawTitle(SOFTWARE_TITLE, SOFTWARE_COPYRIGHT);
 		ReadPad(&Controllers[0], 0);
 		ReadPad(&Controllers[1], 1);
@@ -38,23 +35,18 @@ int main()
 		/*Draw controllers on the screen*/
 		DrawController(10, 65, 0, &Controllers[0]);
 		DrawController(170, 65, 1, &Controllers[1]);
-		
-		/*Draw primitives from the list*/
-		GsDrawList();
-		
-		/*Wait for GPU to finish drawing*/
-		while(GsIsDrawing());
-		
-		/*Wait for vertical sync*/
-		VSync();
+		DrawDX(10, 0);
+		DrawDX(170, 1);
 
-#ifdef DEBUG
-		/*Return to loader (unirom) if 'x' is sent trough serial port*/
-		if(SIOCheckInBuffer()){
-			if(SIOReadByte() == 'x') __asm__("j 0x801B0000");
-		}
-#endif
+		/*Draw primitives from the list and wait for the GPU*/
+		GsDrawList();
+
+		Dx.frame++;
+		UploadDX();
+
+		/*Wait for vertical sync*/
+		VSync(0);
 	}
-	
+
 	return 0;
 }
