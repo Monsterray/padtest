@@ -53,24 +53,59 @@ void DrawTitle(const char* softwareTitle, const char* copyright)
 	TopRect.x = 0;
 	TopRect.y = 0;
 	TopRect.w = 320;
-	TopRect.h = 40;
+	TopRect.h = 32;
 	TopRect.r = 0;
 	TopRect.g = 76;
 	TopRect.b = 163;
 	TopRect.attribute = 0;
-	
+
 	GsSortRectangle(&TopRect);
-	
-	GsPrintString(16, 16, 128, 128, 128, false, softwareTitle);
-	
+
+	GsPrintString(16, 8, 128, 128, 128, false, softwareTitle);
+
 	FontX = GetPrintedStringWidth(false, "PORT 1");
-	GsPrintString(80 - (FontX/2), 46, 128, 128, 128, false, "PORT 1");
-	
+	GsPrintString(80 - (FontX/2), 35, 128, 128, 128, false, "PORT 1");
+
 	FontX = GetPrintedStringWidth(false, "PORT 2");
-	GsPrintString(240 - (FontX/2), 46, 128, 128, 128, false, "PORT 2");
-	
-	/*Credits go top right: the bottom lines hold the diagnostics*/
-	GsPrintString(304 - GetPrintedStringWidth(false, copyright), 16, 128, 128, 128, false, copyright);
+	GsPrintString(240 - (FontX/2), 35, 128, 128, 128, false, "PORT 2");
+
+	/*Credits: two lines, the last one 5 pixels above the bottom of the 240-line screen*/
+	GsPrintString(16, 240 - 5 - 8 - 10, 128, 128, 128, false, copyright);
+}
+
+/*A line drawing of the controller behind its buttons, in controller coordinates (the
+  D-pad's left button at 0, L1 at the top). The DualShock has grips down past its sticks;
+  the digital pad is shorter*/
+static void DrawOutline(int x, int y, int analog)
+{
+	static const int16_t dualshock[][2] = {
+		{-10, 62}, {-4, 42}, {30, 38}, {108, 38}, {142, 42}, {148, 62}, {148, 104},
+		{142, 126}, {132, 132}, {120, 128}, {114, 114}, {22, 114}, {16, 128}, {6, 132},
+		{-4, 126}, {-10, 104},
+	};
+	static const int16_t digital[][2] = {
+		{-10, 62}, {-4, 42}, {30, 38}, {108, 38}, {142, 42}, {148, 62}, {148, 92},
+		{140, 110}, {128, 114}, {116, 108}, {110, 96}, {28, 96}, {22, 108}, {10, 114},
+		{-2, 110}, {-10, 92},
+	};
+	_Static_assert(sizeof(dualshock) == sizeof(digital), "outlines have the same point count");
+	const int16_t (*p)[2] = analog ? dualshock : digital;
+	const int n = (int)(sizeof(dualshock) / sizeof(dualshock[0]));
+	GsLine l;
+
+	l.r = 70;
+	l.g = 70;
+	l.b = 84;
+	l.attribute = 0;
+	for (int i = 0; i < n; i++)
+	{
+		int j = (i + 1) % n;
+		l.x[0] = x + p[i][0];
+		l.y[0] = y + p[i][1];
+		l.x[1] = x + p[j][0];
+		l.y[1] = y + p[j][1];
+		GsSortLine(&l);
+	}
 }
 
 /*Draw the mouse, its buttons and its cursor*/
@@ -139,36 +174,39 @@ void DrawController(int x, int y, Controller* ctrl)
 	{
 		default:
 			FontX = GetPrintedStringWidth(false, "Not supported");
-			GsPrintString(x + 70 - (FontX/2), 56, 128, 128, 128, false, "Not supported");
+			GsPrintString(x + 70 - (FontX/2), 44, 128, 128, 128, false, "Not supported");
 			return;
 			
 		case PAD_NONE:
 			FontX = GetPrintedStringWidth(false, "Not connected");
-			GsPrintString(x + 70 - (FontX/2), 56, 128, 128, 128, false, "Not connected");
+			GsPrintString(x + 70 - (FontX/2), 44, 128, 128, 128, false, "Not connected");
 			return;
 			
         case PAD_MOUSE:
 			FontX = GetPrintedStringWidth(false, "Mouse");
-			GsPrintString(x + 70 - (FontX/2), 56, 128, 128, 128, false, "Mouse");
+			GsPrintString(x + 70 - (FontX/2), 44, 128, 128, 128, false, "Mouse");
 			DrawMouse(x, y, ctrl);
             return;
 
 		case PAD_DIGITAL:
 			FontX = GetPrintedStringWidth(false, "Digital");
-			GsPrintString(x + 70 - (FontX/2), 56, 128, 128, 128, false, "Digital");
+			GsPrintString(x + 70 - (FontX/2), 44, 128, 128, 128, false, "Digital");
 			break;
 			
 		case PAD_ANALOG:
 			AnalogEnabled = 1;
 			FontX = GetPrintedStringWidth(false, "Analog");
-			GsPrintString(x + 70 - (FontX/2), 56, 128, 128, 128, false, "Analog");
+			GsPrintString(x + 70 - (FontX/2), 44, 128, 128, 128, false, "Analog");
 			StickX[0] = ctrl->LeftStickX;
 			StickY[0] = ctrl->LeftStickY;
 			StickX[1] = ctrl->RightStickX;
 			StickY[1] = ctrl->RightStickY;
 			break;
 	}
-	
+
+	/*The outline first: primitives later in the list are drawn over it*/
+	DrawOutline(x, y, AnalogEnabled);
+
 	PadSprite.x = x + 10;
 	PadSprite.y = y;
 	PadSprite.w = 16;
@@ -351,7 +389,7 @@ void DrawDX(int x, int PadId)
 
 	/*ID, 5Ah, then the data bytes, in pairs to fit the column*/
 	for (i = 1; i < p->reply_len && i < 9; i++) n += sprintf(s + n, (i & 1) ? "%02X" : "%02X ", p->reply[i]);
-	GsPrintString(x, 203, 128, 128, 128, false, s);
+	GsPrintString(x, 188, 128, 128, 128, false, s);
 
 	for (i = 0; i < 16; i++) if (p->press[i]) bits++;
 	/*A digital pad answers no config command: 43h gets FFh*/
@@ -359,7 +397,7 @@ void DrawDX(int x, int PadId)
 		sprintf(s, "len%d cfg none btn%d", p->reply_len, bits);
 	else
 		sprintf(s, "len%d cfg%d/%d btn%d", p->reply_len, CfgMatches(PadId), DX_CFG_N, bits);
-	GsPrintString(x, 213, 128, 128, 128, false, s);
+	GsPrintString(x, 198, 128, 128, 128, false, s);
 
 	if (p->type != PAD_ANALOG) return;
 
@@ -371,5 +409,5 @@ void DrawDX(int x, int PadId)
 		for (i = 0; i < 32; i++) c += __builtin_popcount(p->seen[a][i]);
 		n += sprintf(s + n, " %d", c);
 	}
-	GsPrintString(x, 223, 128, 128, 128, false, s);
+	GsPrintString(x, 208, 128, 128, 128, false, s);
 }

@@ -7,8 +7,10 @@
 #include "include/graphics.h"
 #include "include/dx.h"
 
-#define SOFTWARE_TITLE		"PadTest 1.2 DX\n2026-09-23"
-#define SOFTWARE_COPYRIGHT	"Shendo, ggrtk\nPSn00bSDK"
+/*PADTEST_VERSION and PADTEST_DATE come from CMakeLists.txt: the project version and the
+  date of the commit built*/
+#define SOFTWARE_TITLE		"PadTest DX " PADTEST_VERSION "\n" PADTEST_DATE
+#define SOFTWARE_COPYRIGHT	"Authors: Monsterray\nPorted from PadTest by Shendo, ggrtk"
 
 /*Controller for each port*/
 static Controller Controllers[2];
@@ -33,8 +35,8 @@ int main(void)
 		ReadPad(&Controllers[1], 1);
 
 		/*Draw controllers on the screen*/
-		DrawController(10, 65, &Controllers[0]);
-		DrawController(170, 65, &Controllers[1]);
+		DrawController(10, 53, &Controllers[0]);
+		DrawController(170, 53, &Controllers[1]);
 		DrawDX(10, 0);
 		DrawDX(170, 1);
 
