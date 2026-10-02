@@ -1,8 +1,10 @@
 #include <stdio.h>
+#include <string.h>
 #include "include/gs.h"
 #include "include/graphics.h"
 #include "include/text.h"
 #include "include/dx.h"
+#include "include/controllers.h"
 
 #include "images/buttons.h"
 #include "images/mouse.h"
@@ -378,36 +380,141 @@ void DrawController(int x, int y, Controller* ctrl)
 	GsPrintString(x + 78, y + 116, 128, 128, 128, false, TempString);
 }
 
-/*Draw what the port sent: raw reply, reply length, config replies, sweep counters*/
-void DrawDX(int x, int PadId)
+/*Bytes as hex, in pairs: "AABB CCDD" (pair_start 0), or after the first ("AA BBCC", 1).
+  sprintf per byte cost a quarter of a frame with eight slots on screen. Returns the end*/
+static char *HexPairs(char *s, const uint8_t *b, int n, int pair_start)
 {
-	PortDX *p = &Dx.port[PadId];
-	char s[64] = "";
-	int i, n = 0, bits = 0;
+	static const char digit[] = "0123456789ABCDEF";
 
+	for (int i = 0; i < n; i++)
+	{
+		*s++ = digit[b[i] >> 4];
+		*s++ = digit[b[i] & 15];
+		if (((i + pair_start) & 1) && i + 1 < n) *s++ = ' ';
+	}
+	*s = 0;
+	return s;
+}
+
+/*A slot's data as "BBBB SSSSSSSS": the button bytes, then the rest (sticks), no ID or 5Ah*/
+static void SlotData(char *s, const uint8_t *d, int n)
+{
+	s = HexPairs(s, d, n < 2 ? n : 2, 0);
+	if (n > 2)
+	{
+		*s++ = ' ';
+		HexPairs(s, d + 2, n - 2, 0);
+		for (char *c = s; *c; c++) if (*c == ' ') *c = '.';
+	}
+}
+
+/*Distinct values an axis gave*/
+static int AxisValues(const SlotDX *p, int a)
+{
+	int c = 0;
+
+	for (int i = 0; i < 32; i++) c += __builtin_popcount(p->seen[a][i]);
+	return c;
+}
+
+/*Button bits pressed at least once*/
+static int ButtonBits(const SlotDX *p)
+{
+	int bits = 0;
+
+	for (int i = 0; i < 16; i++) if (p->press[i]) bits++;
+	return bits;
+}
+
+/*Config result: a digital pad answers no config command (43h gets FFh)*/
+static void CfgText(char *s, int port, int slot)
+{
+	const SlotDX *p = &Dx.slot[port][slot];
+
+	if (p->cfg[1][0] == PAD_NONE) sprintf(s, "cfg none");
+	else sprintf(s, "cfg%d/%d", CfgMatches(port, slot), DX_CFG_N);
+}
+
+/*A multitap: one block of three lines per slot, then the long read*/
+static void DrawTap(int x, int port)
+{
+	const PortDX *q = &Dx.port[port];
+	char s[64], c[16];
+
+	for (int slot = 0; slot < DX_SLOTS; slot++)
+	{
+		const SlotDX *p = &Dx.slot[port][slot];
+		const int y = 46 + slot * 34;
+
+		if (p->type == PAD_NONE)
+		{
+			sprintf(s, "%c empty  long %02X", 'A' + slot, p->long_reply[0]);
+			GsPrintString(x, y, 90, 90, 90, false, s);
+			continue;
+		}
+		CfgText(c, port, slot);
+		sprintf(s, "%c %02X %s btn%d", 'A' + slot, p->type, c, ButtonBits(p));
+		GsPrintString(x, y, 128, 128, 128, false, s);
+
+		/*The single-slot read: the buttons, then the sticks*/
+		SlotData(s, &p->reply[3], (p->reply_len < 9 ? p->reply_len : 9) - 3);
+		GsPrintString(x + 8, y + 10, 128, 128, 128, false, s);
+
+		/*The slot's block of the long read: its ID, buttons and the rest*/
+		s[0] = 'L';
+		HexPairs(s + 1, p->long_reply, 1, 0);
+		s[3] = ' ';
+		SlotData(s + 4, &p->long_reply[2], 6);
+		if (p->long_diff) sprintf(s + strlen(s), "!%d", p->long_diff);
+		GsPrintString(x, y + 20, 100, 128, 100, false, s);
+	}
+	sprintf(s, "tap %dB x%lu", q->long_len, (unsigned long)q->long_reads);
+	GsPrintString(x, 184, 128, 128, 128, false, s);
+
+	/*The probe (controllers.c, Probe): bytes of a long read held with TAP 1 (35 on Mednafen
+	  and DuckStation, psx-spx's table says 4), of the one after 00h slot blocks (4: Mednafen
+	  and psx-spx) and of a long read with command 43h (Mednafen 4, DuckStation 3), and
+	  whether every probe went as Mednafen's model says*/
+	if (q->probes)
+	{
+		static const uint8_t want[DX_PROBE_N] = {0, 35, 35, 35, 4, 35, 0, 1, 1, 0, 0, 0};	/*0: a single read*/
+		int ok = 1;
+
+		for (int i = 0; i < DX_PROBE_N; i++)
+			if (want[i] ? q->probe_len[i] != want[i] : (i != 10 && q->probe_len[i] < 5)) ok = 0;
+		if (q->probe_len[10] != 4 && q->probe_len[10] != 3) ok = 0;
+		sprintf(s, "probe %d %d %d %s", q->probe_len[2], q->probe_len[4], q->probe_len[10], ok ? "ok" : "differs");
+		GsPrintString(x, 194, ok ? 100 : 160, ok ? 128 : 90, ok ? 100 : 90, false, s);
+	}
+}
+
+/*Draw what the port sent: a multitap's slots, or the raw reply of its device, its config
+  replies and its counters*/
+void DrawDX(int x, int port)
+{
+	const SlotDX *p = &Dx.slot[port][0];
+	char s[64] = "", c[16];
+	int n;
+
+	if (Dx.port[port].tap)
+	{
+		DrawTap(x, port);
+		return;
+	}
 	if (p->type == PAD_NONE) return;
 
 	/*ID, 5Ah, then the data bytes, in pairs to fit the column*/
-	for (i = 1; i < p->reply_len && i < 9; i++) n += sprintf(s + n, (i & 1) ? "%02X" : "%02X ", p->reply[i]);
+	if (p->reply_len > 1) HexPairs(s, &p->reply[1], (p->reply_len < 9 ? p->reply_len : 9) - 1, 1);
 	GsPrintString(x, 188, 128, 128, 128, false, s);
 
-	for (i = 0; i < 16; i++) if (p->press[i]) bits++;
-	/*A digital pad answers no config command: 43h gets FFh*/
-	if (p->cfg[1][0] == PAD_NONE)
-		sprintf(s, "len%d cfg none btn%d", p->reply_len, bits);
-	else
-		sprintf(s, "len%d cfg%d/%d btn%d", p->reply_len, CfgMatches(PadId), DX_CFG_N, bits);
+	CfgText(c, port, 0);
+	sprintf(s, "len%d %s btn%d", p->reply_len, c, ButtonBits(p));
 	GsPrintString(x, 198, 128, 128, 128, false, s);
 
 	if (p->type != PAD_ANALOG) return;
 
 	/*Distinct values each axis gave: LX LY RX RY*/
 	n = sprintf(s, "axes");
-	for (int a = 0; a < 4; a++)
-	{
-		int c = 0;
-		for (i = 0; i < 32; i++) c += __builtin_popcount(p->seen[a][i]);
-		n += sprintf(s + n, " %d", c);
-	}
+	for (int a = 0; a < 4; a++) n += sprintf(s + n, " %d", AxisValues(p, a));
 	GsPrintString(x, 208, 128, 128, 128, false, s);
 }

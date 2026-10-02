@@ -6,9 +6,13 @@
 /*Controller IDs: the low byte of halfword 0 of a reply (psx-spx "Controller ID")*/
 #define PAD_NONE			0xFF	/*Nothing connected: the data line floats high*/
 #define PAD_MOUSE			0x12
+#define PAD_NEGCON			0x23
+#define PAD_KONAMI_GUN		0x31	/*Konami Justifier/Hyperblaster (IRQ10)*/
 #define PAD_DIGITAL			0x41	/*Digital pad, or an analog pad in digital mode*/
 #define PAD_FLIGHT			0x53	/*Analog stick, or an analog pad in green LED mode*/
+#define PAD_GUNCON			0x63	/*Namco GunCon*/
 #define PAD_ANALOG			0x73	/*Analog pad in red LED mode*/
+#define PAD_MULTITAP		0x80	/*Multitap, in a long read (all four slots)*/
 #define PAD_CONFIG			0xF3	/*Any pad in config mode*/
 
 /*Buttons, in Controller.Buttons = ~((reply[3] << 8) | reply[4]), 1 = pressed*/
@@ -52,13 +56,13 @@ typedef struct
 /*Set up the controller port (SIO0) and the timer used to time it*/
 void InitPad(void);
 
-/*Config replies of a port that match a DualShock's*/
-int CfgMatches(int pad_n);
+/*Config replies of a port's slot that match a DualShock's*/
+int CfgMatches(int port, int slot);
 
-/*Reset controller data to default values*/
-void ResetPad(Controller* ctrl);
+/*Read everything on one port (0 or 1): its device, or a multitap and its four slots*/
+void ReadPort(int port);
 
-/*Read controller data from a single port*/
-void ReadPad(Controller* ctrl, int pad_n);
+/*What each port and slot holds; slot 0 is the port's own device when there is no multitap*/
+extern Controller Pads[2][4];
 
 #endif

@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.21)
 project(
 	padtest
 	LANGUAGES    C ASM
-	VERSION      2.3.0
+	VERSION      2.4.0
 	DESCRIPTION  "PadTest DX: PlayStation controller tester"
 )
 

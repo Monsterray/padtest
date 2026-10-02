@@ -12,7 +12,7 @@ void DrawTitle(const char* softwareTitle, const char* copyright);
 /*Draw controller on screen with all the properties*/
 void DrawController(int x, int y, Controller* ctrl);
 
-/*Draw the diagnostic lines for a port at the bottom of the screen*/
+/*Draw the diagnostic lines for a port: a multitap's slots, or its device's reply at the bottom*/
 void DrawDX(int x, int PadId);
 
 #endif
