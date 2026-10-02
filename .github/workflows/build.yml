@@ -50,13 +50,16 @@ jobs:
           cmake --build build
 
       - name: cppcheck
-        # Each finding becomes an annotation on the run
+        # Each finding becomes an annotation on the run. PADTEST_VERSION and PADTEST_DATE come
+        # from CMakeLists.txt in a build; without them cppcheck cannot parse padtest.c
+        # (unknownMacro) and then reports every function it calls as unused.
         run: >
           cppcheck --version &&
           cppcheck --enable=all --check-level=exhaustive --std=c11 --platform=unix32
           --error-exitcode=1 --inline-suppr
           --template='::error file={file},line={line}::cppcheck {severity} [{id}] {message}'
           --suppress=missingIncludeSystem --suppress=checkersReport
+          '-DPADTEST_VERSION="ci"' '-DPADTEST_DATE="ci"'
           -I include -I "$HOME/psn00bsdk/include/libpsn00b" -q *.c
 
       - uses: actions/upload-artifact@v7
